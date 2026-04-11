@@ -1,3 +1,20 @@
+include .env
+export
+
+MIGRATIONS_DIR := ./internal/server/migrations
+
+check-database-dsn:
+ifndef DATABASE_DSN
+	$(error DATABASE_DSN is not set. Please create .env file or set environment variable)
+endif
+
+migrate-up: check-database-dsn
+	@echo "Applying migrations"
+	migrate -path $(MIGRATIONS_DIR) -database "$(DATABASE_DSN)" up
+
+migrate-down: check-database-dsn
+	@echo "Rolling back last migration..."
+	migrate -path $(MIGRATIONS_DIR) -database "$(DATABASE_DSN)" down 1
 
 gen-proto:
 	@echo "Generating protobuf files..."
@@ -10,3 +27,6 @@ build-server:
 
 build-client:
 	go build -o cmd/client/client ./cmd/client
+
+run:
+	go run cmd/server/main.go
