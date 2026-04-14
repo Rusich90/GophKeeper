@@ -7,11 +7,13 @@ import (
 
 	"log/slog"
 
-	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 
+	"github.com/Rusich90/GophKeeper/internal/server/jwt"
 	"github.com/Rusich90/GophKeeper/internal/server/model"
+	"github.com/Rusich90/GophKeeper/internal/server/storage/token"
 	"github.com/Rusich90/GophKeeper/internal/server/storage/user"
+	"github.com/Rusich90/GophKeeper/pkg/validator"
 )
 
 var (
@@ -20,21 +22,27 @@ var (
 )
 
 type AuthService struct {
-	userRepo user.UserRepository
-	log      *slog.Logger
+	userRepo  user.UserRepository
+	tokenRepo token.TokenRepository
+	jwtMgr    *jwt.Manager
+	log       *slog.Logger
+	validator validator.CredentialsValidator
 }
 
-func NewAuthService(userRepo user.UserRepository, log *slog.Logger) *AuthService {
+func NewAuthService(userRepo user.UserRepository, tokenRepo token.TokenRepository, jwtMgr *jwt.Manager, log *slog.Logger) *AuthService {
 	return &AuthService{
-		userRepo: userRepo,
-		log:      log,
+		userRepo:  userRepo,
+		tokenRepo: tokenRepo,
+		jwtMgr:    jwtMgr,
+		log:       log,
+		validator: validator.NewCredentialsValidator(),
 	}
 }
 
 func (s *AuthService) Register(ctx context.Context, login, password string) error {
 	s.log.Debug("Register attempt", "login", login)
 
-	if err := validateCredentials(login, password); err != nil {
+	if err := s.validator.ValidateCredentials(login, password); err != nil {
 		s.log.Warn("Invalid credentials", "login", login, "error", err)
 		return err
 	}
@@ -76,7 +84,7 @@ func (s *AuthService) Register(ctx context.Context, login, password string) erro
 func (s *AuthService) Login(ctx context.Context, login, password string) (string, error) {
 	s.log.Debug("Login attempt", "login", login)
 
-	if err := validateCredentials(login, password); err != nil {
+	if err := s.validator.ValidateCredentials(login, password); err != nil {
 		s.log.Warn("Invalid credentials", "login", login, "error", err)
 		return "", err
 	}
@@ -96,29 +104,58 @@ func (s *AuthService) Login(ctx context.Context, login, password string) (string
 		return "", ErrInvalidCredentials
 	}
 
-	token := uuid.New().String()
+	// Создаем JWT токен
+	tokenString, err := s.jwtMgr.GenerateToken(u.Login)
+	if err != nil {
+		s.log.Error("Failed to generate token", "login", login, "error", err)
+		return "", fmt.Errorf("failed to generate token: %w", err)
+	}
+
+	// Сохраняем токен в Redis с ключом = login
+	if err := s.tokenRepo.StoreToken(ctx, u.Login, tokenString); err != nil {
+		s.log.Error("Failed to store token", "login", login, "error", err)
+		return "", fmt.Errorf("failed to store token: %w", err)
+	}
+
 	s.log.Info("User logged in successfully", "login", login)
-	return token, nil
+	return tokenString, nil
 }
 
-func validateCredentials(login, password string) error {
-	if login == "" {
-		return errors.New("login cannot be empty")
+func (s *AuthService) Logout(ctx context.Context, login string) error {
+	s.log.Debug("Logout attempt", "login", login)
+
+	if err := s.tokenRepo.DeleteToken(ctx, login); err != nil {
+		s.log.Error("Failed to delete token", "error", err)
+		return fmt.Errorf("failed to delete token: %w", err)
 	}
-	if len(login) < 3 {
-		return errors.New("login must be at least 3 characters")
-	}
-	if len(login) > 50 {
-		return errors.New("login must be at most 50 characters")
-	}
-	if password == "" {
-		return errors.New("password cannot be empty")
-	}
-	if len(password) < 6 {
-		return errors.New("password must be at least 6 characters")
-	}
-	if len(password) > 100 {
-		return errors.New("password must be at most 100 characters")
-	}
+
+	s.log.Info("User logged out successfully", "login", login)
 	return nil
+}
+
+func (s *AuthService) ValidateToken(ctx context.Context, tokenString string) (string, error) {
+	s.log.Debug("Validating token")
+
+	// Проверяем подпись JWT токена и получаем login
+	login, err := s.jwtMgr.ValidateToken(tokenString)
+	if err != nil {
+		s.log.Warn("Failed to validate JWT token", "error", err)
+		return "", fmt.Errorf("invalid token: %w", err)
+	}
+
+	// Получаем актуальный токен из Redis по login
+	storedToken, err := s.tokenRepo.GetToken(ctx, login)
+	if err != nil {
+		s.log.Warn("Token not found in storage", "login", login, "error", err)
+		return "", fmt.Errorf("token not found or expired")
+	}
+
+	// Сравниваем токен из запроса с актуальным токеном
+	if storedToken != tokenString {
+		s.log.Warn("Token mismatch", "login", login)
+		return "", fmt.Errorf("invalid token")
+	}
+
+	s.log.Debug("Token validated successfully", "login", login)
+	return login, nil
 }

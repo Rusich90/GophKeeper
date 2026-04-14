@@ -11,6 +11,8 @@ type Config struct {
 	GRPCPort    string
 	DatabaseDSN string
 	Environment string
+	RedisAddr   string
+	JWTSecret   string
 }
 
 // InitConfig загружает конфигурацию из .env файла или переменных окружения
@@ -23,6 +25,8 @@ func InitConfig() *Config {
 		GRPCPort:    getEnv("GRPC_PORT", "50051"),
 		DatabaseDSN: getEnv("DATABASE_DSN", "postgres://postgres:postgres@localhost:5432/gophkeeper?sslmode=disable"),
 		Environment: getEnv("ENV", "dev"),
+		RedisAddr:   getEnv("REDIS_ADDR", "localhost:6379"),
+		JWTSecret:   getEnv("JWT_SECRET", "your-secret-key-change-in-production"),
 	}
 }
 

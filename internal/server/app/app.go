@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"net"
 	"os"
@@ -15,8 +16,11 @@ import (
 	"github.com/Rusich90/GophKeeper/internal/server/config"
 	"github.com/Rusich90/GophKeeper/internal/server/db"
 	"github.com/Rusich90/GophKeeper/internal/server/handler"
+	"github.com/Rusich90/GophKeeper/internal/server/jwt"
 	"github.com/Rusich90/GophKeeper/internal/server/logger"
+	"github.com/Rusich90/GophKeeper/internal/server/middleware"
 	"github.com/Rusich90/GophKeeper/internal/server/service"
+	"github.com/Rusich90/GophKeeper/internal/server/storage/token"
 	"github.com/Rusich90/GophKeeper/internal/server/storage/user"
 	"github.com/Rusich90/GophKeeper/pkg/pb"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -27,10 +31,11 @@ const (
 )
 
 type App struct {
-	cfg    *config.Config
-	pool   *pgxpool.Pool
-	server *grpc.Server
-	log    *slog.Logger
+	cfg       *config.Config
+	pool      *pgxpool.Pool
+	tokenRepo *token.RedisTokenRepo
+	server    *grpc.Server
+	log       *slog.Logger
 }
 
 func NewApp(cfg *config.Config, log *slog.Logger) (*App, error) {
@@ -46,13 +51,28 @@ func NewApp(cfg *config.Config, log *slog.Logger) (*App, error) {
 	}
 	a.pool = pool
 
+	// Инициализация Redis для хранения токенов
+	tokenRepo := token.NewRedisTokenRepo(cfg.RedisAddr)
+	if err := tokenRepo.Ping(ctx); err != nil {
+		a.log.Error("Failed to connect to Redis", "error", err)
+		return nil, fmt.Errorf("failed to connect to Redis: %w", err)
+	}
+	a.tokenRepo = tokenRepo
+	a.log.Info("Redis connected successfully")
+
+	// Инициализация JWT менеджера
+	jwtMgr := jwt.NewManager(cfg.JWTSecret)
+
+	// Инициализация репозиториев и сервисов
 	userRepo := user.NewPGUserRepo(a.pool)
-	authService := service.NewAuthService(userRepo, a.log)
+	authService := service.NewAuthService(userRepo, tokenRepo, jwtMgr, a.log)
 	authServer := handler.NewAuthServer(authService, a.log)
 
+	// Создание gRPC сервера с middleware
 	grpcServer := grpc.NewServer(
 		grpc.ChainUnaryInterceptor(
 			logger.GRPCLoggingInterceptor(a.log),
+			middleware.AuthMiddleware(authService),
 		),
 	)
 
@@ -123,5 +143,11 @@ func (a *App) Stop() error {
 
 	a.pool.Close()
 	a.log.Info("Database pool closed")
+
+	if err := a.tokenRepo.Close(); err != nil {
+		a.log.Error("Error closing Redis connection", "error", err)
+	}
+	a.log.Info("Redis connection closed")
+
 	return nil
 }

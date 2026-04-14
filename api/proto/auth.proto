@@ -4,9 +4,12 @@ package gophkeeper.v1;
 
 option go_package = "gophkeeper/pkg/pb";
 
+import "google/protobuf/empty.proto";
+
 service Auth {
   rpc Register (RegisterRequest) returns (RegisterResponse);
   rpc Login (LoginRequest) returns (LoginResponse);
+  rpc Logout (google.protobuf.Empty) returns (LogoutResponse);
 }
 
 message RegisterRequest {
@@ -25,4 +28,8 @@ message LoginRequest {
 
 message LoginResponse {
   string token = 1;
+}
+
+message LogoutResponse {
+  string message = 1;
 }

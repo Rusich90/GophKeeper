@@ -26,7 +26,34 @@ build-server:
 	go build -o cmd/server/server ./cmd/server
 
 build-client:
-	go build -o cmd/client/client ./cmd/client
+	go build -o keeper ./cmd/client
 
 run:
 	go run cmd/server/main.go
+
+docker-up:
+	@echo "Starting all services with Docker Compose..."
+	docker compose up -d
+
+docker-down:
+	@echo "Stopping all services..."
+	docker compose down
+
+docker-build:
+	@echo "Building Docker images..."
+	docker compose build
+
+docker-logs:
+	@echo "Showing logs..."
+	docker compose logs -f
+
+docker-restart: docker-down docker-up
+	@echo "Restarting all services..."
+
+docker-migrate-up:
+	@echo "Applying migrations in Docker..."
+	docker compose exec -T server migrate -path /app/migrations -database "$(DATABASE_DSN)" up
+
+docker-migrate-down:
+	@echo "Rolling back last migration in Docker..."
+	docker compose exec -T server migrate -path /app/migrations -database "$(DATABASE_DSN)" down 1
