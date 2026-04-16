@@ -45,7 +45,7 @@ func NewApp(cfg *config.Config, log *slog.Logger) (*App, error) {
 	}
 
 	ctx := context.Background()
-	pool, err := db.NewConnection(ctx, cfg.DatabaseDSN)
+	pool, err := db.NewConnection(ctx, cfg.DatabaseDSN, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -61,7 +61,11 @@ func NewApp(cfg *config.Config, log *slog.Logger) (*App, error) {
 	a.log.Info("Redis connected successfully")
 
 	// Инициализация JWT менеджера
-	jwtMgr := jwt.NewManager(cfg.JWTSecret)
+	tokenTTL, err := time.ParseDuration(cfg.TokenTTL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse token TTL: %w", err)
+	}
+	jwtMgr := jwt.NewManager(cfg.JWTSecret, tokenTTL)
 
 	// Инициализация репозиториев и сервисов
 	userRepo := user.NewPGUserRepo(a.pool)

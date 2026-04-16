@@ -9,18 +9,20 @@ import (
 
 type Manager struct {
 	secret string
+	ttl    time.Duration
 }
 
-func NewManager(secret string) *Manager {
+func NewManager(secret string, ttl time.Duration) *Manager {
 	return &Manager{
 		secret: secret,
+		ttl:    ttl,
 	}
 }
 
 func (m *Manager) GenerateToken(login string) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"login": login,
-		"exp":   time.Now().Add(10 * time.Minute).Unix(),
+		"exp":   time.Now().Add(m.ttl).Unix(),
 	})
 
 	tokenString, err := token.SignedString([]byte(m.secret))

@@ -7,12 +7,22 @@ import (
 	"github.com/joho/godotenv"
 )
 
+const (
+	DefaultGRPCPort    string = "50051"
+	DefaultDatabaseDSN string = "postgres://postgres:postgres@localhost:5432/gophkeeper?sslmode=disable"
+	DefaultEnvironment string = "dev"
+	DefaultRedisAddr   string = "localhost:6379"
+	DefaultJWTSecret   string = "your-secret-key-change-in-production"
+	DefaultTokenTTL    string = "10m"
+)
+
 type Config struct {
 	GRPCPort    string
 	DatabaseDSN string
 	Environment string
 	RedisAddr   string
 	JWTSecret   string
+	TokenTTL    string
 }
 
 // InitConfig загружает конфигурацию из .env файла или переменных окружения
@@ -22,11 +32,12 @@ func InitConfig() *Config {
 	}
 
 	return &Config{
-		GRPCPort:    getEnv("GRPC_PORT", "50051"),
-		DatabaseDSN: getEnv("DATABASE_DSN", "postgres://postgres:postgres@localhost:5432/gophkeeper?sslmode=disable"),
-		Environment: getEnv("ENV", "dev"),
-		RedisAddr:   getEnv("REDIS_ADDR", "localhost:6379"),
-		JWTSecret:   getEnv("JWT_SECRET", "your-secret-key-change-in-production"),
+		GRPCPort:    getEnv("GRPC_PORT", DefaultGRPCPort),
+		DatabaseDSN: getEnv("DATABASE_DSN", DefaultDatabaseDSN),
+		Environment: getEnv("ENV", DefaultEnvironment),
+		RedisAddr:   getEnv("REDIS_ADDR", DefaultRedisAddr),
+		JWTSecret:   getEnv("JWT_SECRET", DefaultJWTSecret),
+		TokenTTL:    getEnv("TOKEN_TTL", DefaultTokenTTL),
 	}
 }
 
