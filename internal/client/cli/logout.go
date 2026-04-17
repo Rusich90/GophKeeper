@@ -12,7 +12,7 @@ import (
 var logoutCmd = &cobra.Command{
 	Use:   "logout",
 	Short: "Выход из системы",
-	Long:  `Выход из системы и удаление сохраненного токена авторизации.`,
+	Long:  `Выход из системы и удаление сохраненной сессии.`,
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Получаем output из контекста
@@ -27,24 +27,24 @@ var logoutCmd = &cobra.Command{
 			return fmt.Errorf("сервис авторизации не инициализирован")
 		}
 
-		// Инициализируем хранилище токенов
-		tokenStorage := storage.NewTokenStorage()
+		// Инициализируем хранилище сессий
+		sessionStorage := storage.NewSessionStorage()
 
-		// Проверяем, есть ли токен
-		token, err := tokenStorage.LoadToken()
+		// Проверяем, есть ли сессия
+		session, err := sessionStorage.LoadSession()
 		if err != nil {
 			output.Warning("Вы не авторизованы")
 			return nil
 		}
 
 		// Вызываем серверный метод logout
-		if err := authService.Logout(cmd.Context(), token); err != nil {
+		if err := authService.Logout(cmd.Context(), session.Token); err != nil {
 			output.Warning(fmt.Sprintf("Не удалось уведомить сервер о выходе: %v", err))
-			// Продолжаем удаление локального токена даже если сервер недоступен
+			// Продолжаем удаление локальной сессии даже если сервер недоступен
 		}
 
-		// Удаляем токен локально
-		if err := tokenStorage.DeleteToken(); err != nil {
+		// Удаляем сессию локально
+		if err := sessionStorage.DeleteSession(); err != nil {
 			output.Errorf("Ошибка при выходе: %v", err)
 			return fmt.Errorf("ошибка при выходе: %w", err)
 		}

@@ -20,11 +20,11 @@ var statusCmd = &cobra.Command{
 			return fmt.Errorf("сервис вывода не инициализирован")
 		}
 
-		// Инициализируем хранилище токенов
-		tokenStorage := storage.NewTokenStorage()
+		// Инициализируем хранилище сессий
+		sessionStorage := storage.NewSessionStorage()
 
-		// Проверяем наличие токена
-		_, err := tokenStorage.LoadToken()
+		// Проверяем наличие сессии
+		session, err := sessionStorage.LoadSession()
 		if err != nil {
 			output.Warning("Статус: Не авторизован")
 			output.Plain("Для входа используйте: keeper login")
@@ -32,6 +32,11 @@ var statusCmd = &cobra.Command{
 		}
 
 		output.Success("Статус: Авторизован")
+		if session.Key != "" {
+			output.Plain("Ключ шифрования: сохранен")
+		} else {
+			output.Warning("Ключ шифрования: не сохранен")
+		}
 		return nil
 	},
 }

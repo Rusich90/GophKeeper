@@ -34,8 +34,8 @@ var loginCmd = &cobra.Command{
 			return fmt.Errorf("сервис авторизации не инициализирован")
 		}
 
-		// Инициализируем хранилище токенов
-		tokenStorage := storage.NewTokenStorage()
+		// Инициализируем хранилище сессий
+		sessionStorage := storage.NewSessionStorage()
 
 		// Получаем логин
 		var login string
@@ -79,14 +79,23 @@ var loginCmd = &cobra.Command{
 			return fmt.Errorf("ошибка входа: %w", err)
 		}
 
-		// Сохраняем токен
-		if err := tokenStorage.SaveToken(token); err != nil {
-			output.Errorf("Ошибка сохранения токена: %v", err)
-			return fmt.Errorf("ошибка сохранения токена: %w", err)
+		// Генерируем ключ шифрования из пароля
+		encryptionKey := storage.GenerateEncryptionKey(password)
+
+		// Создаем сессию с токеном и ключом шифрования
+		session := &storage.Session{
+			Token: token,
+			Key:   encryptionKey,
+		}
+
+		// Сохраняем сессию
+		if err := sessionStorage.SaveSession(session); err != nil {
+			output.Errorf("Ошибка сохранения сессии: %v", err)
+			return fmt.Errorf("ошибка сохранения сессии: %w", err)
 		}
 
 		output.Success("Вход выполнен успешно!")
-		output.Plain("Токен сохранен. Вы авторизованы.")
+		output.Plain("Сессия сохранена. Вы авторизованы.")
 		return nil
 	},
 }
