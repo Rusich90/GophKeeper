@@ -20,8 +20,11 @@ var statusCmd = &cobra.Command{
 			return fmt.Errorf("сервис вывода не инициализирован")
 		}
 
-		// Инициализируем хранилище сессий
-		sessionStorage := storage.NewSessionStorage()
+		// Получаем хранилище сессий из контекста
+		sessionStorage, ok := cmd.Context().Value("sessionStorage").(*storage.SessionStorage)
+		if !ok {
+			return fmt.Errorf("хранилище сессий не инициализировано")
+		}
 
 		// Проверяем наличие сессии
 		session, err := sessionStorage.LoadSession()

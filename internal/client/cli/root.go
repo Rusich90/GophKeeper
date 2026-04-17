@@ -8,6 +8,7 @@ import (
 	"github.com/Rusich90/GophKeeper/internal/client/config"
 	"github.com/Rusich90/GophKeeper/internal/client/grpc"
 	"github.com/Rusich90/GophKeeper/internal/client/service"
+	"github.com/Rusich90/GophKeeper/internal/client/storage"
 	"github.com/spf13/cobra"
 )
 
@@ -68,6 +69,10 @@ CLI клиент позволяет управлять вашими данным
 		// Инициализация сервиса авторизации
 		authService := service.NewAuthService(grpcClient)
 		ctx = context.WithValue(ctx, "authService", authService)
+
+		// Инициализация хранилища сессий
+		sessionStorage := storage.NewSessionStorage()
+		ctx = context.WithValue(ctx, "sessionStorage", sessionStorage)
 
 		cmd.SetContext(ctx)
 		return nil

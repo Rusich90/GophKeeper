@@ -34,8 +34,11 @@ var loginCmd = &cobra.Command{
 			return fmt.Errorf("сервис авторизации не инициализирован")
 		}
 
-		// Инициализируем хранилище сессий
-		sessionStorage := storage.NewSessionStorage()
+		// Получаем хранилище сессий из контекста
+		sessionStorage, ok := cmd.Context().Value("sessionStorage").(*storage.SessionStorage)
+		if !ok {
+			return fmt.Errorf("хранилище сессий не инициализировано")
+		}
 
 		// Получаем логин
 		var login string
