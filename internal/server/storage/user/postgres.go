@@ -44,3 +44,27 @@ func (r *PGUserRepo) FindByLogin(ctx context.Context, login string) (*model.User
 
 	return &user, nil
 }
+
+func (r *PGUserRepo) GetUserData(ctx context.Context, login string) ([]byte, int64, error) {
+	query := `SELECT encrypted_data, updated_at FROM users WHERE login = $1`
+
+	var encryptedData []byte
+	var updatedAt int64
+	err := r.pool.QueryRow(ctx, query, login).Scan(&encryptedData, &updatedAt)
+
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, 0, fmt.Errorf("%w: %s", ErrUserNotFound, login)
+		}
+		return nil, 0, fmt.Errorf("failed to get user data: %w", err)
+	}
+
+	return encryptedData, updatedAt, nil
+}
+
+func (r *PGUserRepo) UpdateUserData(ctx context.Context, login string, encryptedData []byte, updatedAt int64) error {
+	query := `UPDATE users SET encrypted_data = $1, updated_at = $2 WHERE login = $3`
+
+	_, err := r.pool.Exec(ctx, query, encryptedData, updatedAt, login)
+	return err
+}

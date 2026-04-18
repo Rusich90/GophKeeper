@@ -1,19 +1,11 @@
 package storage
 
 import (
-	"crypto/sha256"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 )
-
-// Session представляет сессию пользователя с токеном и ключом шифрования
-type Session struct {
-	Token string `json:"token"`
-	Key   string `json:"key"`
-}
 
 // SessionStorage управляет сохранением и загрузкой сессии пользователя
 type SessionStorage struct {
@@ -35,23 +27,6 @@ func NewSessionStorage() *SessionStorage {
 	return &SessionStorage{
 		sessionFile: filepath.Join(configDir, "session.json"),
 	}
-}
-
-// getConfigDir возвращает директорию для хранения конфигурации
-func getConfigDir() (string, error) {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return "", fmt.Errorf("failed to get home directory: %w", err)
-	}
-
-	configDir := filepath.Join(homeDir, ".gophkeeper")
-
-	// Создаем директорию с правами только для владельца
-	if err := os.MkdirAll(configDir, 0700); err != nil {
-		return "", fmt.Errorf("failed to create config directory: %w", err)
-	}
-
-	return configDir, nil
 }
 
 // SaveSession сохраняет сессию в файл
@@ -92,10 +67,4 @@ func (ss *SessionStorage) DeleteSession() error {
 		return fmt.Errorf("failed to delete session file: %w", err)
 	}
 	return nil
-}
-
-// GenerateEncryptionKey генерирует ключ шифрования из пароля
-func GenerateEncryptionKey(password string) string {
-	hash := sha256.Sum256([]byte(password))
-	return base64.StdEncoding.EncodeToString(hash[:])
 }

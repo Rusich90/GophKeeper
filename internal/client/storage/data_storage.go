@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/Rusich90/GophKeeper/internal/client/crypto"
 )
 
 // DataStorage управляет сохранением и загрузкой зашифрованных данных
@@ -45,7 +47,7 @@ func (ds *DataStorage) Load(key string) (*Storage, error) {
 	}
 
 	// Расшифровываем данные
-	plaintext, err := Decrypt(ciphertext, key)
+	plaintext, err := crypto.Decrypt(ciphertext, key)
 	if err != nil {
 		return nil, fmt.Errorf("ошибка расшифровки данных: %w", err)
 	}
@@ -71,7 +73,7 @@ func (ds *DataStorage) Save(storage *Storage, key string) error {
 	}
 
 	// Шифруем данные
-	ciphertext, err := Encrypt(plaintext, key)
+	ciphertext, err := crypto.Encrypt(plaintext, key)
 	if err != nil {
 		return fmt.Errorf("ошибка шифрования данных: %w", err)
 	}

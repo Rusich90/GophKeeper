@@ -70,7 +70,10 @@ func NewApp(cfg *config.Config, log *slog.Logger) (*App, error) {
 	// Инициализация репозиториев и сервисов
 	userRepo := user.NewPGUserRepo(a.pool)
 	authService := service.NewAuthService(userRepo, tokenRepo, jwtMgr, a.log)
+	syncService := service.NewSyncService(userRepo, a.log)
+	
 	authServer := handler.NewAuthServer(authService, a.log)
+	syncServer := handler.NewSyncServer(syncService, a.log)
 
 	// Создание gRPC сервера с middleware
 	grpcServer := grpc.NewServer(
@@ -81,6 +84,7 @@ func NewApp(cfg *config.Config, log *slog.Logger) (*App, error) {
 	)
 
 	pb.RegisterAuthServer(grpcServer, authServer)
+	pb.RegisterSyncServer(grpcServer, syncServer)
 
 	reflection.Register(grpcServer)
 

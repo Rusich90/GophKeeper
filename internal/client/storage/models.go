@@ -32,6 +32,13 @@ type Item struct {
 	CVV         string `json:"cvv,omitempty"`
 }
 
+// Session представляет сессию пользователя с токеном и ключом шифрования
+type Session struct {
+	Token      string `json:"token"`
+	Key        string `json:"key"`
+	LastSyncTS int64  `json:"last_sync_ts"` // Время последней синхронизации (Unix timestamp)
+}
+
 // NewItem создает новую запись с текущим временем (UTC)
 func NewItem(itemType, title string) Item {
 	now := time.Now().UTC().Format(time.RFC3339)

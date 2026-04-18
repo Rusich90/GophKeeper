@@ -9,6 +9,7 @@ import (
 	"github.com/Rusich90/GophKeeper/internal/client/grpc"
 	"github.com/Rusich90/GophKeeper/internal/client/service"
 	"github.com/Rusich90/GophKeeper/internal/client/storage"
+	"github.com/Rusich90/GophKeeper/internal/client/ui"
 	"github.com/spf13/cobra"
 )
 
@@ -16,7 +17,7 @@ var (
 	cfgFile    string
 	serverAddr string
 	verbose    bool
-	output     *ColorOutput
+	uiInstance *ui.UI
 )
 
 // rootCmd представляет базовую команду CLI приложения
@@ -26,11 +27,8 @@ var rootCmd = &cobra.Command{
 	Long: `GophKeeper - это безопасное хранилище секретов.
 CLI клиент позволяет управлять вашими данными через командную строку.`,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-		// Инициализация вывода
-		output = NewColorOutput(verbose)
-
-		// Инициализация рендерера таблиц
-		tableRenderer := NewTableRenderer()
+		// Инициализация UI
+		uiInstance = ui.NewUI(verbose)
 
 		// Инициализация конфигурации
 		var cfg *config.Config
@@ -40,14 +38,14 @@ CLI клиент позволяет управлять вашими данным
 			// Используем указанный файл конфигурации
 			cfg, err = config.InitConfigWithPath(cfgFile)
 			if err != nil {
-				output.Errorf("Ошибка загрузки конфигурации: %v", err)
+				uiInstance.Output.Errorf("Ошибка загрузки конфигурации: %v", err)
 				return fmt.Errorf("ошибка загрузки конфигурации: %w", err)
 			}
 		} else {
 			// Используем стандартный файл конфигурации в домашней директории
 			cfg, err = config.InitConfig()
 			if err != nil {
-				output.Errorf("Ошибка инициализации конфигурации: %v", err)
+				uiInstance.Output.Errorf("Ошибка инициализации конфигурации: %v", err)
 				return fmt.Errorf("ошибка инициализации конфигурации: %w", err)
 			}
 		}
@@ -60,14 +58,14 @@ CLI клиент позволяет управлять вашими данным
 		// Инициализация gRPC клиента
 		grpcClient, err := grpc.NewClient(cfg.ServerAddr)
 		if err != nil {
-			output.Errorf("Ошибка подключения к серверу: %v", err)
+			uiInstance.Output.Errorf("Ошибка подключения к серверу: %v", err)
 			return fmt.Errorf("ошибка подключения к серверу: %w", err)
 		}
 
 		// Сохраняем клиента в контексте команды
 		ctx := context.WithValue(cmd.Context(), "grpcClient", grpcClient)
 		ctx = context.WithValue(ctx, "config", cfg)
-		ctx = context.WithValue(ctx, "output", output)
+		ctx = context.WithValue(ctx, "ui", uiInstance)
 
 		// Инициализация сервиса авторизации
 		authService := service.NewAuthService(grpcClient)
@@ -76,9 +74,6 @@ CLI клиент позволяет управлять вашими данным
 		// Инициализация хранилища сессий
 		sessionStorage := storage.NewSessionStorage()
 		ctx = context.WithValue(ctx, "sessionStorage", sessionStorage)
-
-		// Сохраняем рендерер таблиц в контексте
-		ctx = context.WithValue(ctx, "tableRenderer", tableRenderer)
 
 		cmd.SetContext(ctx)
 		return nil
@@ -97,10 +92,10 @@ CLI клиент позволяет управлять вашими данным
 // Она инициализирует все команды и обрабатывает выполнение.
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
-		if output == nil {
+		if uiInstance == nil {
 			fmt.Fprintf(os.Stderr, "Ошибка: %v\n", err)
 		} else {
-			output.Errorf("%v", err)
+			uiInstance.Output.Errorf("%v", err)
 		}
 		os.Exit(1)
 	}

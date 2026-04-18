@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/Rusich90/GophKeeper/internal/client/storage"
+	"github.com/Rusich90/GophKeeper/internal/client/ui"
 	"github.com/spf13/cobra"
 )
 
@@ -19,10 +20,10 @@ var deleteCmd = &cobra.Command{
 Аргумент id - это начало идентификатора записи (минимум 1 символ).`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// Получаем output из контекста
-		output, ok := cmd.Context().Value("output").(*ColorOutput)
+		// Получаем UI из контекста
+		uiInstance, ok := cmd.Context().Value("ui").(*ui.UI)
 		if !ok {
-			return fmt.Errorf("сервис вывода не инициализирован")
+			return fmt.Errorf("UI не инициализирован")
 		}
 
 		// Получаем хранилище сессий из контекста
@@ -34,7 +35,7 @@ var deleteCmd = &cobra.Command{
 		// Получаем ключ шифрования из сессии
 		session, err := sessionStorage.LoadSession()
 		if err != nil {
-			output.Error("Сессия не инициализирована. Пожалуйста, войдите в систему.")
+			uiInstance.Output.Error("Сессия не инициализирована. Пожалуйста, войдите в систему.")
 			return fmt.Errorf("сессия не инициализирована: %w", err)
 		}
 
@@ -42,7 +43,7 @@ var deleteCmd = &cobra.Command{
 		dataStorage := storage.NewDataStorage()
 		storageData, err := dataStorage.Load(session.Key)
 		if err != nil {
-			output.Errorf("Ошибка загрузки данных: %v", err)
+			uiInstance.Output.Errorf("Ошибка загрузки данных: %v", err)
 			return fmt.Errorf("ошибка загрузки данных: %w", err)
 		}
 
@@ -63,7 +64,7 @@ var deleteCmd = &cobra.Command{
 		// Обработка результатов поиска
 		switch len(foundItems) {
 		case 0:
-			output.Errorf("Запись с ID '%s' не найдена", idPrefix)
+			uiInstance.Output.Errorf("Запись с ID '%s' не найдена", idPrefix)
 			return fmt.Errorf("запись не найдена")
 			
 		case 1:
@@ -77,22 +78,16 @@ var deleteCmd = &cobra.Command{
 			
 			// Сохраняем данные
 			if err := dataStorage.Save(storageData, session.Key); err != nil {
-				output.Errorf("Ошибка сохранения данных: %v", err)
+				uiInstance.Output.Errorf("Ошибка сохранения данных: %v", err)
 				return fmt.Errorf("ошибка сохранения данных: %w", err)
 			}
 			
-			output.Success(fmt.Sprintf("Запись '%s' успешно удалена", item.Title))
+			uiInstance.Output.Success(fmt.Sprintf("Запись '%s' успешно удалена", item.Title))
 			
 		default:
-			// Получаем рендерер таблиц из контекста
-			tableRenderer, ok := cmd.Context().Value("tableRenderer").(*TableRenderer)
-			if !ok {
-				return fmt.Errorf("рендерер таблиц не инициализирован")
-			}
-
 			// Найдено несколько записей - выводим таблицу дубликатов
-			output.Plain(fmt.Sprintf("Найдено несколько записей с префиксом '%s', уточните запрос:", idPrefix))
-			tableRenderer.RenderDuplicatesTable(foundItems)
+			uiInstance.Output.Plain(fmt.Sprintf("Найдено несколько записей с префиксом '%s', уточните запрос:", idPrefix))
+			uiInstance.TableRenderer.RenderDuplicatesTable(foundItems)
 		}
 
 		return nil

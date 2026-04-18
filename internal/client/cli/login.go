@@ -1,16 +1,14 @@
 package cli
 
 import (
-	"bufio"
 	"fmt"
-	"os"
 	"strings"
-	"syscall"
 
+	"github.com/Rusich90/GophKeeper/internal/client/crypto"
 	"github.com/Rusich90/GophKeeper/internal/client/service"
 	"github.com/Rusich90/GophKeeper/internal/client/storage"
+	"github.com/Rusich90/GophKeeper/internal/client/ui"
 	"github.com/spf13/cobra"
-	"golang.org/x/term"
 )
 
 // loginCmd представляет команду входа
@@ -22,10 +20,10 @@ var loginCmd = &cobra.Command{
 Пароль запрашивается интерактивно для безопасности.`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// Получаем output из контекста
-		output, ok := cmd.Context().Value("output").(*ColorOutput)
+		// Получаем UI из контекста
+		uiInstance, ok := cmd.Context().Value("ui").(*ui.UI)
 		if !ok {
-			return fmt.Errorf("сервис вывода не инициализирован")
+			return fmt.Errorf("UI не инициализирован")
 		}
 
 		// Получаем сервис авторизации из контекста
@@ -45,9 +43,8 @@ var loginCmd = &cobra.Command{
 		if len(args) > 0 {
 			login = strings.TrimSpace(args[0])
 		} else {
-			reader := bufio.NewReader(os.Stdin)
-			fmt.Print("Введите логин: ")
-			loginInput, err := reader.ReadString('\n')
+			uiInstance.Input.Print("Введите логин: ")
+			loginInput, err := uiInstance.Input.ReadString('\n')
 			if err != nil {
 				return fmt.Errorf("ошибка чтения логина: %w", err)
 			}
@@ -55,35 +52,35 @@ var loginCmd = &cobra.Command{
 		}
 
 		if login == "" {
-			output.Error("Логин не может быть пустым")
+			uiInstance.Output.Error("Логин не может быть пустым")
 			return fmt.Errorf("логин не может быть пустым")
 		}
 
 		// Получаем пароль интерактивно
-		fmt.Print("Введите пароль: ")
-		passwordBytes, err := term.ReadPassword(int(syscall.Stdin))
-		fmt.Println() // Добавляем перевод строки после ввода пароля
+		uiInstance.Input.Print("Введите пароль: ")
+		passwordBytes, err := uiInstance.Input.ReadPassword()
+		uiInstance.Input.Println("") // Добавляем перевод строки после ввода пароля
 		if err != nil {
 			return fmt.Errorf("ошибка чтения пароля: %w", err)
 		}
 		password := string(passwordBytes)
 
 		if password == "" {
-			output.Error("Пароль не может быть пустым")
+			uiInstance.Output.Error("Пароль не может быть пустым")
 			return fmt.Errorf("пароль не может быть пустым")
 		}
 
 		// Выполняем вход
-		output.Debugf("Вход пользователя: %s", login)
+		uiInstance.Output.Debugf("Вход пользователя: %s", login)
 
 		token, err := authService.Login(cmd.Context(), login, password)
 		if err != nil {
-			output.Errorf("Ошибка входа: %v", err)
+			uiInstance.Output.Errorf("Ошибка входа: %v", err)
 			return fmt.Errorf("ошибка входа: %w", err)
 		}
 
 		// Генерируем ключ шифрования из пароля
-		encryptionKey := storage.GenerateEncryptionKey(password)
+		encryptionKey := crypto.GenerateEncryptionKey(password)
 
 		// Создаем сессию с токеном и ключом шифрования
 		session := &storage.Session{
@@ -93,12 +90,12 @@ var loginCmd = &cobra.Command{
 
 		// Сохраняем сессию
 		if err := sessionStorage.SaveSession(session); err != nil {
-			output.Errorf("Ошибка сохранения сессии: %v", err)
+			uiInstance.Output.Errorf("Ошибка сохранения сессии: %v", err)
 			return fmt.Errorf("ошибка сохранения сессии: %w", err)
 		}
 
-		output.Success("Вход выполнен успешно!")
-		output.Plain("Сессия сохранена. Вы авторизованы.")
+		uiInstance.Output.Success("Вход выполнен успешно!")
+		uiInstance.Output.Plain("Сессия сохранена. Вы авторизованы.")
 		return nil
 	},
 }

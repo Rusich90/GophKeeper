@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/Rusich90/GophKeeper/internal/client/storage"
+	"github.com/Rusich90/GophKeeper/internal/client/ui"
 	"github.com/spf13/cobra"
 )
 
@@ -19,10 +20,10 @@ var listCmd = &cobra.Command{
   - card: данные банковской карты`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// Получаем output из контекста
-		output, ok := cmd.Context().Value("output").(*ColorOutput)
+		// Получаем UI из контекста
+		uiInstance, ok := cmd.Context().Value("ui").(*ui.UI)
 		if !ok {
-			return fmt.Errorf("сервис вывода не инициализирован")
+			return fmt.Errorf("UI не инициализирован")
 		}
 
 		// Получаем хранилище сессий из контекста
@@ -34,14 +35,14 @@ var listCmd = &cobra.Command{
 		// Валидация типа данных
 		dataType := args[0]
 		if dataType != "login" && dataType != "text" && dataType != "card" {
-			output.Error("Неизвестный тип данных. Доступные: login, text, card")
+			uiInstance.Output.Error("Неизвестный тип данных. Доступные: login, text, card")
 			return fmt.Errorf("неизвестный тип данных: %s", dataType)
 		}
 
 		// Получаем ключ шифрования из сессии
 		session, err := sessionStorage.LoadSession()
 		if err != nil {
-			output.Error("Сессия не инициализирована. Пожалуйста, войдите в систему.")
+			uiInstance.Output.Error("Сессия не инициализирована. Пожалуйста, войдите в систему.")
 			return fmt.Errorf("сессия не инициализирована: %w", err)
 		}
 
@@ -49,7 +50,7 @@ var listCmd = &cobra.Command{
 		dataStorage := storage.NewDataStorage()
 		storageData, err := dataStorage.Load(session.Key)
 		if err != nil {
-			output.Errorf("Ошибка загрузки данных: %v", err)
+			uiInstance.Output.Errorf("Ошибка загрузки данных: %v", err)
 			return fmt.Errorf("ошибка загрузки данных: %w", err)
 		}
 
@@ -63,24 +64,18 @@ var listCmd = &cobra.Command{
 
 		// Проверяем, есть ли записи
 		if len(filteredItems) == 0 {
-			output.Plain("Записи не найдены")
+			uiInstance.Output.Plain("Записи не найдены")
 			return nil
-		}
-
-		// Получаем рендерер таблиц из контекста
-		tableRenderer, ok := cmd.Context().Value("tableRenderer").(*TableRenderer)
-		if !ok {
-			return fmt.Errorf("рендерер таблиц не инициализирован")
 		}
 
 		// Диспетчеризация функций рендеринга
 		switch dataType {
 		case "login":
-			tableRenderer.RenderLoginTable(filteredItems)
+			uiInstance.TableRenderer.RenderLoginTable(filteredItems)
 		case "text":
-			tableRenderer.RenderTextTable(filteredItems)
+			uiInstance.TableRenderer.RenderTextTable(filteredItems)
 		case "card":
-			tableRenderer.RenderCardTable(filteredItems)
+			uiInstance.TableRenderer.RenderCardTable(filteredItems)
 		}
 
 		return nil

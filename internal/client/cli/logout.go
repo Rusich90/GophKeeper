@@ -5,6 +5,7 @@ import (
 
 	"github.com/Rusich90/GophKeeper/internal/client/service"
 	"github.com/Rusich90/GophKeeper/internal/client/storage"
+	"github.com/Rusich90/GophKeeper/internal/client/ui"
 	"github.com/spf13/cobra"
 )
 
@@ -15,10 +16,10 @@ var logoutCmd = &cobra.Command{
 	Long:  `Выход из системы и удаление сохраненной сессии.`,
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// Получаем output из контекста
-		output, ok := cmd.Context().Value("output").(*ColorOutput)
+		// Получаем UI из контекста
+		uiInstance, ok := cmd.Context().Value("ui").(*ui.UI)
 		if !ok {
-			return fmt.Errorf("сервис вывода не инициализирован")
+			return fmt.Errorf("UI не инициализирован")
 		}
 
 		// Получаем сервис авторизации из контекста
@@ -36,23 +37,23 @@ var logoutCmd = &cobra.Command{
 		// Проверяем, есть ли сессия
 		session, err := sessionStorage.LoadSession()
 		if err != nil {
-			output.Warning("Вы не авторизованы")
+			uiInstance.Output.Warning("Вы не авторизованы")
 			return nil
 		}
 
 		// Вызываем серверный метод logout
 		if err := authService.Logout(cmd.Context(), session.Token); err != nil {
-			output.Warning(fmt.Sprintf("Не удалось уведомить сервер о выходе: %v", err))
+			uiInstance.Output.Warning(fmt.Sprintf("Не удалось уведомить сервер о выходе: %v", err))
 			// Продолжаем удаление локальной сессии даже если сервер недоступен
 		}
 
 		// Удаляем сессию локально
 		if err := sessionStorage.DeleteSession(); err != nil {
-			output.Errorf("Ошибка при выходе: %v", err)
+			uiInstance.Output.Errorf("Ошибка при выходе: %v", err)
 			return fmt.Errorf("ошибка при выходе: %w", err)
 		}
 
-		output.Success("Выход выполнен успешно")
+		uiInstance.Output.Success("Выход выполнен успешно")
 		return nil
 	},
 }

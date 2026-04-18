@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/Rusich90/GophKeeper/internal/client/storage"
+	"github.com/Rusich90/GophKeeper/internal/client/ui"
 	"github.com/spf13/cobra"
 )
 
@@ -14,10 +15,10 @@ var statusCmd = &cobra.Command{
 	Long:  `Проверяет текущий статус авторизации пользователя.`,
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// Получаем output из контекста
-		output, ok := cmd.Context().Value("output").(*ColorOutput)
+		// Получаем UI из контекста
+		uiInstance, ok := cmd.Context().Value("ui").(*ui.UI)
 		if !ok {
-			return fmt.Errorf("сервис вывода не инициализирован")
+			return fmt.Errorf("UI не инициализирован")
 		}
 
 		// Получаем хранилище сессий из контекста
@@ -29,16 +30,16 @@ var statusCmd = &cobra.Command{
 		// Проверяем наличие сессии
 		session, err := sessionStorage.LoadSession()
 		if err != nil {
-			output.Warning("Статус: Не авторизован")
-			output.Plain("Для входа используйте: keeper login")
+			uiInstance.Output.Warning("Статус: Не авторизован")
+			uiInstance.Output.Plain("Для входа используйте: keeper login")
 			return nil
 		}
 
-		output.Success("Статус: Авторизован")
+		uiInstance.Output.Success("Статус: Авторизован")
 		if session.Key != "" {
-			output.Plain("Ключ шифрования: сохранен")
+			uiInstance.Output.Plain("Ключ шифрования: сохранен")
 		} else {
-			output.Warning("Ключ шифрования: не сохранен")
+			uiInstance.Output.Warning("Ключ шифрования: не сохранен")
 		}
 		return nil
 	},

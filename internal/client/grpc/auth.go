@@ -16,8 +16,9 @@ import (
 
 // Client представляет gRPC клиент для работы с сервером
 type Client struct {
-	conn   *grpc.ClientConn
-	client pb.AuthClient
+	conn       *grpc.ClientConn
+	authClient pb.AuthClient
+	syncClient pb.SyncClient
 }
 
 // NewClient создает новый gRPC клиент и подключается к серверу
@@ -34,8 +35,9 @@ func NewClient(serverAddr string) (*Client, error) {
 	}
 
 	return &Client{
-		conn:   conn,
-		client: pb.NewAuthClient(conn),
+		conn:       conn,
+		authClient: pb.NewAuthClient(conn),
+		syncClient: pb.NewSyncClient(conn),
 	}, nil
 }
 
@@ -47,7 +49,7 @@ func (c *Client) Login(ctx context.Context, login, password string) (string, err
 	}
 
 	// Вызываем RPC метод
-	resp, err := c.client.Login(ctx, req)
+	resp, err := c.authClient.Login(ctx, req)
 	if err != nil {
 		// Пытаемся извлечь статус ошибки от gRPC
 		st, ok := status.FromError(err)
@@ -74,7 +76,7 @@ func (c *Client) Register(ctx context.Context, login, password string) error {
 		Password: password,
 	}
 
-	_, err := c.client.Register(ctx, req)
+	_, err := c.authClient.Register(ctx, req)
 	if err != nil {
 		st, ok := status.FromError(err)
 		if ok {
@@ -99,7 +101,7 @@ func (c *Client) Logout(ctx context.Context, token string) error {
 	md := metadata.Pairs("authorization", "Bearer "+token)
 	ctx = metadata.NewOutgoingContext(ctx, md)
 
-	_, err := c.client.Logout(ctx, &emptypb.Empty{})
+	_, err := c.authClient.Logout(ctx, &emptypb.Empty{})
 	if err != nil {
 		st, ok := status.FromError(err)
 		if ok {
@@ -114,6 +116,60 @@ func (c *Client) Logout(ctx context.Context, token string) error {
 	}
 
 	return nil
+}
+
+// Pull получает зашифрованные данные с сервера
+func (c *Client) Pull(ctx context.Context, token string) ([]byte, int64, error) {
+	// Добавляем токен в метаданные для middleware
+	md := metadata.Pairs("authorization", "Bearer "+token)
+	ctx = metadata.NewOutgoingContext(ctx, md)
+
+	resp, err := c.syncClient.Pull(ctx, &emptypb.Empty{})
+	if err != nil {
+		st, ok := status.FromError(err)
+		if ok {
+			switch st.Code() {
+			case codes.Unauthenticated:
+				return nil, 0, fmt.Errorf("authentication failed")
+			case codes.Unavailable:
+				return nil, 0, fmt.Errorf("server is unavailable")
+			default:
+				return nil, 0, fmt.Errorf("pull failed: %s", st.Message())
+			}
+		}
+		return nil, 0, fmt.Errorf("connection error: %w", err)
+	}
+
+	return resp.Data, resp.UpdatedAt, nil
+}
+
+// Push отправляет зашифрованные данные на сервер
+func (c *Client) Push(ctx context.Context, token string, data []byte) (int64, error) {
+	// Добавляем токен в метаданные для middleware
+	md := metadata.Pairs("authorization", "Bearer "+token)
+	ctx = metadata.NewOutgoingContext(ctx, md)
+
+	req := &pb.SyncRequest{
+		Data: data,
+	}
+
+	resp, err := c.syncClient.Push(ctx, req)
+	if err != nil {
+		st, ok := status.FromError(err)
+		if ok {
+			switch st.Code() {
+			case codes.Unauthenticated:
+				return 0, fmt.Errorf("authentication failed")
+			case codes.Unavailable:
+				return 0, fmt.Errorf("server is unavailable")
+			default:
+				return 0, fmt.Errorf("push failed: %s", st.Message())
+			}
+		}
+		return 0, fmt.Errorf("connection error: %w", err)
+	}
+
+	return resp.UpdatedAt, nil
 }
 
 // Close закрывает соединение с gRPC сервером

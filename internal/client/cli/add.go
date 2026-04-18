@@ -1,15 +1,12 @@
 package cli
 
 import (
-	"bufio"
 	"fmt"
-	"os"
 	"strings"
-	"syscall"
 
 	"github.com/Rusich90/GophKeeper/internal/client/storage"
+	"github.com/Rusich90/GophKeeper/internal/client/ui"
 	"github.com/spf13/cobra"
-	"golang.org/x/term"
 )
 
 // addCmd представляет команду добавления новой записи
@@ -23,10 +20,10 @@ var addCmd = &cobra.Command{
   - text: текстовая заметка
   - card: данные банковской карты`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// Получаем output из контекста
-		output, ok := cmd.Context().Value("output").(*ColorOutput)
+		// Получаем UI из контекста
+		uiInstance, ok := cmd.Context().Value("ui").(*ui.UI)
 		if !ok {
-			return fmt.Errorf("сервис вывода не инициализирован")
+			return fmt.Errorf("UI не инициализирован")
 		}
 
 		// Получаем хранилище сессий из контекста
@@ -38,21 +35,20 @@ var addCmd = &cobra.Command{
 		// Этап 1: Получение ключа шифрования из сессии
 		session, err := sessionStorage.LoadSession()
 		if err != nil {
-			output.Error("Сессия не инициализирована. Пожалуйста, войдите в систему.")
+			uiInstance.Output.Error("Сессия не инициализирована. Пожалуйста, войдите в систему.")
 			return fmt.Errorf("сессия не инициализирована: %w", err)
 		}
 
 		// Этап 2: Интерактивный ввод данных
-		reader := bufio.NewReader(os.Stdin)
 
 		// Выбор типа записи
-		fmt.Println("\nДоступные типы записей:")
-		fmt.Println("  1. login - логин и пароль")
-		fmt.Println("  2. text  - текстовая заметка")
-		fmt.Println("  3. card  - данные банковской карты")
-		fmt.Print("\nВыберите тип записи (1-3): ")
+		uiInstance.Input.Println("\nДоступные типы записей:")
+		uiInstance.Input.Println("  1. login - логин и пароль")
+		uiInstance.Input.Println("  2. text  - текстовая заметка")
+		uiInstance.Input.Println("  3. card  - данные банковской карты")
+		uiInstance.Input.Print("\nВыберите тип записи (1-3): ")
 
-		typeChoice, err := reader.ReadString('\n')
+		typeChoice, err := uiInstance.Input.ReadString('\n')
 		if err != nil {
 			return fmt.Errorf("ошибка чтения типа: %w", err)
 		}
@@ -67,26 +63,26 @@ var addCmd = &cobra.Command{
 		case "3":
 			itemType = "card"
 		default:
-			output.Error("Неверный выбор типа записи")
+			uiInstance.Output.Error("Неверный выбор типа записи")
 			return fmt.Errorf("неверный тип записи: %s", typeChoice)
 		}
 
 		// Ввод названия
-		fmt.Print("Введите название записи: ")
-		title, err := reader.ReadString('\n')
+		uiInstance.Input.Print("Введите название записи: ")
+		title, err := uiInstance.Input.ReadString('\n')
 		if err != nil {
 			return fmt.Errorf("ошибка чтения названия: %w", err)
 		}
 		title = strings.TrimSpace(title)
 
 		if title == "" {
-			output.Error("Название не может быть пустым")
+			uiInstance.Output.Error("Название не может быть пустым")
 			return fmt.Errorf("название не может быть пустым")
 		}
 
 		// Ввод метаданных (опционально)
-		fmt.Print("Введите метаданные (опционально, формат: ключ=значение, разделенные пробелом): ")
-		metadataInput, _ := reader.ReadString('\n')
+		uiInstance.Input.Print("Введите метаданные (опционально, формат: ключ=значение, разделенные пробелом): ")
+		metadataInput, _ := uiInstance.Input.ReadString('\n')
 		metadataInput = strings.TrimSpace(metadataInput)
 
 		metadata := make(map[string]string)
@@ -107,26 +103,26 @@ var addCmd = &cobra.Command{
 		// Специфичные поля для каждого типа
 		switch itemType {
 		case "login":
-			fmt.Print("Введите логин: ")
-			username, err := reader.ReadString('\n')
+			uiInstance.Input.Print("Введите логин: ")
+			username, err := uiInstance.Input.ReadString('\n')
 			if err != nil {
 				return fmt.Errorf("ошибка чтения логина: %w", err)
 			}
 			item.Username = strings.TrimSpace(username)
 
-			fmt.Print("Введите пароль: ")
-			passwordBytes, err := term.ReadPassword(int(syscall.Stdin))
-			fmt.Println() // Добавляем перевод строки после ввода пароля
+			uiInstance.Input.Print("Введите пароль: ")
+			passwordBytes, err := uiInstance.Input.ReadPassword()
+			uiInstance.Input.Println("") // Добавляем перевод строки после ввода пароля
 			if err != nil {
 				return fmt.Errorf("ошибка чтения пароля: %w", err)
 			}
 			item.Password = string(passwordBytes)
 
 		case "text":
-			fmt.Println("Введите содержимое заметки (завершите пустой строкой):")
+			uiInstance.Input.Println("Введите содержимое заметки (завершите пустой строкой):")
 			var contentLines []string
 			for {
-				line, err := reader.ReadString('\n')
+				line, err := uiInstance.Input.ReadString('\n')
 				if err != nil {
 					return fmt.Errorf("ошибка чтения содержимого: %w", err)
 				}
@@ -139,29 +135,29 @@ var addCmd = &cobra.Command{
 			item.Content = strings.Join(contentLines, "\n")
 
 		case "card":
-			fmt.Print("Введите номер карты: ")
-			number, err := reader.ReadString('\n')
+			uiInstance.Input.Print("Введите номер карты: ")
+			number, err := uiInstance.Input.ReadString('\n')
 			if err != nil {
 				return fmt.Errorf("ошибка чтения номера карты: %w", err)
 			}
 			item.Number = strings.TrimSpace(number)
 
-			fmt.Print("Введите месяц истечения (MM): ")
-			expiryMonth, err := reader.ReadString('\n')
+			uiInstance.Input.Print("Введите месяц истечения (MM): ")
+			expiryMonth, err := uiInstance.Input.ReadString('\n')
 			if err != nil {
 				return fmt.Errorf("ошибка чтения месяца: %w", err)
 			}
 			item.ExpiryMonth = strings.TrimSpace(expiryMonth)
 
-			fmt.Print("Введите год истечения (YY): ")
-			expiryYear, err := reader.ReadString('\n')
+			uiInstance.Input.Print("Введите год истечения (YY): ")
+			expiryYear, err := uiInstance.Input.ReadString('\n')
 			if err != nil {
 				return fmt.Errorf("ошибка чтения года: %w", err)
 			}
 			item.ExpiryYear = strings.TrimSpace(expiryYear)
 
-			fmt.Print("Введите CVV: ")
-			cvv, err := reader.ReadString('\n')
+			uiInstance.Input.Print("Введите CVV: ")
+			cvv, err := uiInstance.Input.ReadString('\n')
 			if err != nil {
 				return fmt.Errorf("ошибка чтения CVV: %w", err)
 			}
@@ -174,7 +170,7 @@ var addCmd = &cobra.Command{
 		// Загружаем существующие данные или создаем новые
 		storageData, err := dataStorage.Load(session.Key)
 		if err != nil {
-			output.Errorf("Ошибка загрузки данных: %v", err)
+			uiInstance.Output.Errorf("Ошибка загрузки данных: %v", err)
 			return fmt.Errorf("ошибка загрузки данных: %w", err)
 		}
 
@@ -183,11 +179,11 @@ var addCmd = &cobra.Command{
 
 		// Этап 5: Сохранение данных
 		if err := dataStorage.Save(storageData, session.Key); err != nil {
-			output.Errorf("Ошибка сохранения данных: %v", err)
+			uiInstance.Output.Errorf("Ошибка сохранения данных: %v", err)
 			return fmt.Errorf("ошибка сохранения данных: %w", err)
 		}
 
-		output.Success("Запись успешно добавлена и сохранена.")
+		uiInstance.Output.Success("Запись успешно добавлена и сохранена.")
 		return nil
 	},
 }
