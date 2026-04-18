@@ -3,9 +3,6 @@ package cli
 import (
 	"fmt"
 
-	"github.com/Rusich90/GophKeeper/internal/client/service"
-	"github.com/Rusich90/GophKeeper/internal/client/storage"
-	"github.com/Rusich90/GophKeeper/internal/client/ui"
 	"github.com/spf13/cobra"
 )
 
@@ -16,44 +13,36 @@ var logoutCmd = &cobra.Command{
 	Long:  `Выход из системы и удаление сохраненной сессии.`,
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// Получаем UI из контекста
-		uiInstance, ok := cmd.Context().Value("ui").(*ui.UI)
-		if !ok {
-			return fmt.Errorf("UI не инициализирован")
-		}
-
-		// Получаем сервис авторизации из контекста
-		authService, ok := cmd.Context().Value("authService").(service.AuthService)
-		if !ok {
-			return fmt.Errorf("сервис авторизации не инициализирован")
-		}
-
-		// Получаем хранилище сессий из контекста
-		sessionStorage, ok := cmd.Context().Value("sessionStorage").(*storage.SessionStorage)
-		if !ok {
-			return fmt.Errorf("хранилище сессий не инициализировано")
-		}
-
-		// Проверяем, есть ли сессия
-		session, err := sessionStorage.LoadSession()
+		// Получаем контейнер из контекста
+		container, err := GetContainer(cmd)
 		if err != nil {
-			uiInstance.Output.Warning("Вы не авторизованы")
+			return err
+		}
+
+		// Проверяем, есть ли сессия (опционально)
+		session, err := LoadSessionOptional(container)
+		if err != nil {
+			return err
+		}
+
+		if session == nil {
+			container.UI.Output.Warning("Вы не авторизованы")
 			return nil
 		}
 
 		// Вызываем серверный метод logout
-		if err := authService.Logout(cmd.Context(), session.Token); err != nil {
-			uiInstance.Output.Warning(fmt.Sprintf("Не удалось уведомить сервер о выходе: %v", err))
+		if err := container.AuthService.Logout(cmd.Context(), session.Token); err != nil {
+			container.UI.Output.Warning(fmt.Sprintf("Не удалось уведомить сервер о выходе: %v", err))
 			// Продолжаем удаление локальной сессии даже если сервер недоступен
 		}
 
 		// Удаляем сессию локально
-		if err := sessionStorage.DeleteSession(); err != nil {
-			uiInstance.Output.Errorf("Ошибка при выходе: %v", err)
+		if err := container.SessionStorage.DeleteSession(); err != nil {
+			container.UI.Output.Errorf("Ошибка при выходе: %v", err)
 			return fmt.Errorf("ошибка при выходе: %w", err)
 		}
 
-		uiInstance.Output.Success("Выход выполнен успешно")
+		container.UI.Output.Success("Выход выполнен успешно")
 		return nil
 	},
 }

@@ -20,9 +20,9 @@ type SyncService interface {
 
 // syncService реализация SyncService
 type syncService struct {
-	grpcClient      *grpc.Client
-	sessionStorage  *storage.SessionStorage
-	dataFilePath    string
+	grpcClient     *grpc.Client
+	sessionStorage *storage.SessionStorage
+	dataFilePath   string
 }
 
 // NewSyncService создает новый экземпляр сервиса синхронизации
@@ -31,7 +31,7 @@ func NewSyncService(grpcClient *grpc.Client, sessionStorage *storage.SessionStor
 	if err != nil {
 		configDir = ".gophkeeper"
 	}
-	
+
 	return &syncService{
 		grpcClient:     grpcClient,
 		sessionStorage: sessionStorage,
@@ -39,45 +39,45 @@ func NewSyncService(grpcClient *grpc.Client, sessionStorage *storage.SessionStor
 	}
 }
 
-// Sync выполняет полную синхронизацию данных с сервером
+// Sync выполняет полную синхронизацию секретов с сервером
 func (s *syncService) Sync(ctx context.Context, session *storage.Session) error {
-	// Шаг 1: Инициализация - загружаем локальные данные
+	// Шаг 1: Инициализация - загружаем локальные секреты
 	localSecrets, err := s.loadLocalSecrets(session.Key)
 	if err != nil {
-		return fmt.Errorf("ошибка загрузки локальных данных: %w", err)
+		return fmt.Errorf("ошибка загрузки локальных секретов: %w", err)
 	}
 
-	// Шаг 2: Pull - получаем данные с сервера
+	// Шаг 2: Pull - получаем секреты с сервера
 	serverData, serverTime, err := s.grpcClient.Pull(ctx, session.Token)
 	if err != nil {
-		return fmt.Errorf("ошибка получения данных с сервера: %w", err)
+		return fmt.Errorf("ошибка получения секретов с сервера: %w", err)
 	}
 
-	// Шаг 3: Merge - объединяем данные
+	// Шаг 3: Merge - объединяем секреты
 	mergedSecrets, err := s.mergeSecrets(localSecrets, serverData, session.Key, session.LastSyncTS, serverTime)
 	if err != nil {
-		return fmt.Errorf("ошибка объединения данных: %w", err)
+		return fmt.Errorf("ошибка объединения секретов: %w", err)
 	}
 
-	// Шаг 4: Push - отправляем данные на сервер
+	// Шаг 4: Push - отправляем секреты на сервер
 	mergedJSON, err := json.Marshal(mergedSecrets)
 	if err != nil {
-		return fmt.Errorf("ошибка сериализации данных: %w", err)
+		return fmt.Errorf("ошибка сериализации секретов: %w", err)
 	}
 
 	encryptedData, err := crypto.Encrypt(mergedJSON, session.Key)
 	if err != nil {
-		return fmt.Errorf("ошибка шифрования данных: %w", err)
+		return fmt.Errorf("ошибка шифрования секретов: %w", err)
 	}
 
 	newServerTime, err := s.grpcClient.Push(ctx, session.Token, encryptedData)
 	if err != nil {
-		return fmt.Errorf("ошибка отправки данных на сервер: %w", err)
+		return fmt.Errorf("ошибка отправки секретов на сервер: %w", err)
 	}
 
-	// Шаг 5: Финализация - сохраняем локальные данные
+	// Шаг 5: Финализация - сохраняем локальные секреты
 	if err := s.saveLocalSecrets(mergedSecrets, session.Key); err != nil {
-		return fmt.Errorf("ошибка сохранения локальных данных: %w", err)
+		return fmt.Errorf("ошибка сохранения локальных секретов: %w", err)
 	}
 
 	// Обновляем last_sync_ts в сессии
@@ -89,7 +89,7 @@ func (s *syncService) Sync(ctx context.Context, session *storage.Session) error 
 	return nil
 }
 
-// loadLocalSecrets загружает и расшифровывает локальные данные
+// loadLocalSecrets загружает и расшифровывает локальные секреты
 func (s *syncService) loadLocalSecrets(key string) (*storage.Storage, error) {
 	data, err := os.ReadFile(s.dataFilePath)
 	if err != nil {
@@ -97,32 +97,32 @@ func (s *syncService) loadLocalSecrets(key string) (*storage.Storage, error) {
 			// Если файл не существует, возвращаем пустое хранилище
 			return storage.NewStorage(), nil
 		}
-		return nil, fmt.Errorf("ошибка чтения файла данных: %w", err)
+		return nil, fmt.Errorf("ошибка чтения файла секретов: %w", err)
 	}
 
 	decryptedData, err := crypto.Decrypt(data, key)
 	if err != nil {
-		return nil, fmt.Errorf("ошибка расшифровки данных: %w", err)
+		return nil, fmt.Errorf("ошибка расшифровки секретов: %w", err)
 	}
 
 	var store storage.Storage
 	if err := json.Unmarshal(decryptedData, &store); err != nil {
-		return nil, fmt.Errorf("ошибка парсинга данных: %w", err)
+		return nil, fmt.Errorf("ошибка парсинга секретов: %w", err)
 	}
 
 	return &store, nil
 }
 
-// saveLocalSecrets шифрует и сохраняет локальные данные
+// saveLocalSecrets шифрует и сохраняет локальные секреты
 func (s *syncService) saveLocalSecrets(store *storage.Storage, key string) error {
 	data, err := json.Marshal(store)
 	if err != nil {
-		return fmt.Errorf("ошибка сериализации данных: %w", err)
+		return fmt.Errorf("ошибка сериализации секретов: %w", err)
 	}
 
 	encryptedData, err := crypto.Encrypt(data, key)
 	if err != nil {
-		return fmt.Errorf("ошибка шифрования данных: %w", err)
+		return fmt.Errorf("ошибка шифрования секретов: %w", err)
 	}
 
 	// Убеждаемся, что директория существует
@@ -132,28 +132,28 @@ func (s *syncService) saveLocalSecrets(store *storage.Storage, key string) error
 	}
 
 	if err := os.WriteFile(s.dataFilePath, encryptedData, 0600); err != nil {
-		return fmt.Errorf("ошибка записи файла данных: %w", err)
+		return fmt.Errorf("ошибка записи файла секретов: %w", err)
 	}
 
 	return nil
 }
 
-// mergeSecrets объединяет локальные и серверные данные
+// mergeSecrets объединяет локальные и серверные секреты
 func (s *syncService) mergeSecrets(local *storage.Storage, serverData []byte, key string, lastSyncTS, serverTime int64) (*storage.Storage, error) {
-	// Если данные на сервере не новее, возвращаем локальные данные
+	// Если секреты на сервере не новее, возвращаем локальные секреты
 	if lastSyncTS >= serverTime {
 		return local, nil
 	}
 
-	// Расшифровываем данные с сервера
+	// Расшифровываем секреты с сервера
 	decryptedServerData, err := crypto.Decrypt(serverData, key)
 	if err != nil {
-		return nil, fmt.Errorf("ошибка расшифровки серверных данных: %w", err)
+		return nil, fmt.Errorf("ошибка расшифровки серверных секретов: %w", err)
 	}
 
 	var server storage.Storage
 	if err := json.Unmarshal(decryptedServerData, &server); err != nil {
-		return nil, fmt.Errorf("ошибка парсинга серверных данных: %w", err)
+		return nil, fmt.Errorf("ошибка парсинга серверных секретов: %w", err)
 	}
 
 	// Создаем мапу для быстрого поиска по ID
@@ -167,7 +167,7 @@ func (s *syncService) mergeSecrets(local *storage.Storage, serverData []byte, ke
 		serverMap[item.ID] = item
 	}
 
-	// Объединяем данные - оптимизированный алгоритм O(n)
+	// Объединяем секреты - оптимизированный алгоритм O(n)
 	mergedMap := make(map[string]storage.Item)
 
 	// Добавляем все локальные записи в мапу результата

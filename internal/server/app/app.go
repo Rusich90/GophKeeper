@@ -71,7 +71,7 @@ func NewApp(cfg *config.Config, log *slog.Logger) (*App, error) {
 	userRepo := user.NewPGUserRepo(a.pool)
 	authService := service.NewAuthService(userRepo, tokenRepo, jwtMgr, a.log)
 	syncService := service.NewSyncService(userRepo, a.log)
-	
+
 	authServer := handler.NewAuthServer(authService, a.log)
 	syncServer := handler.NewSyncServer(syncService, a.log)
 

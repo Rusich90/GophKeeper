@@ -1,12 +1,6 @@
 package cli
 
 import (
-	"fmt"
-
-	"github.com/Rusich90/GophKeeper/internal/client/grpc"
-	"github.com/Rusich90/GophKeeper/internal/client/service"
-	"github.com/Rusich90/GophKeeper/internal/client/storage"
-	"github.com/Rusich90/GophKeeper/internal/client/ui"
 	"github.com/spf13/cobra"
 )
 
@@ -22,27 +16,24 @@ func init() {
 }
 
 func runSync(cmd *cobra.Command, args []string) error {
-	ctx := cmd.Context()
-	uiInstance := ctx.Value("ui").(*ui.UI)
-	grpcClient := ctx.Value("grpcClient").(*grpc.Client)
-	sessionStorage := ctx.Value("sessionStorage").(*storage.SessionStorage)
-
-	// Загружаем сессию
-	session, err := sessionStorage.LoadSession()
+	// Получаем контейнер из контекста
+	container, err := GetContainer(cmd)
 	if err != nil {
-		uiInstance.Output.Errorf("Ошибка загрузки сессии: %v", err)
-		return fmt.Errorf("ошибка загрузки сессии: %w", err)
-	}
-
-	// Создаем сервис синхронизации
-	syncService := service.NewSyncService(grpcClient, sessionStorage)
-
-	// Выполняем синхронизацию
-	if err := syncService.Sync(ctx, session); err != nil {
-		uiInstance.Output.Errorf("Ошибка синхронизации: %v", err)
 		return err
 	}
 
-	uiInstance.Output.Success("Синхронизация завершена успешно")
+	// Загружаем сессию
+	session, err := LoadSession(container)
+	if err != nil {
+		return err
+	}
+
+	// Выполняем синхронизацию
+	if err := container.SyncService.Sync(cmd.Context(), session); err != nil {
+		container.UI.Output.Errorf("Ошибка синхронизации: %v", err)
+		return err
+	}
+
+	container.UI.Output.Success("Синхронизация завершена успешно")
 	return nil
 }

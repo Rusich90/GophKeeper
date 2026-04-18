@@ -6,10 +6,6 @@ import (
 	"os"
 
 	"github.com/Rusich90/GophKeeper/internal/client/config"
-	"github.com/Rusich90/GophKeeper/internal/client/grpc"
-	"github.com/Rusich90/GophKeeper/internal/client/service"
-	"github.com/Rusich90/GophKeeper/internal/client/storage"
-	"github.com/Rusich90/GophKeeper/internal/client/ui"
 	"github.com/spf13/cobra"
 )
 
@@ -17,7 +13,6 @@ var (
 	cfgFile    string
 	serverAddr string
 	verbose    bool
-	uiInstance *ui.UI
 )
 
 // rootCmd представляет базовую команду CLI приложения
@@ -27,9 +22,6 @@ var rootCmd = &cobra.Command{
 	Long: `GophKeeper - это безопасное хранилище секретов.
 CLI клиент позволяет управлять вашими данными через командную строку.`,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-		// Инициализация UI
-		uiInstance = ui.NewUI(verbose)
-
 		// Инициализация конфигурации
 		var cfg *config.Config
 		var err error
@@ -38,14 +30,14 @@ CLI клиент позволяет управлять вашими данным
 			// Используем указанный файл конфигурации
 			cfg, err = config.InitConfigWithPath(cfgFile)
 			if err != nil {
-				uiInstance.Output.Errorf("Ошибка загрузки конфигурации: %v", err)
+				fmt.Fprintf(os.Stderr, "Ошибка загрузки конфигурации: %v\n", err)
 				return fmt.Errorf("ошибка загрузки конфигурации: %w", err)
 			}
 		} else {
 			// Используем стандартный файл конфигурации в домашней директории
 			cfg, err = config.InitConfig()
 			if err != nil {
-				uiInstance.Output.Errorf("Ошибка инициализации конфигурации: %v", err)
+				fmt.Fprintf(os.Stderr, "Ошибка инициализации конфигурации: %v\n", err)
 				return fmt.Errorf("ошибка инициализации конфигурации: %w", err)
 			}
 		}
@@ -55,33 +47,22 @@ CLI клиент позволяет управлять вашими данным
 			cfg.ServerAddr = serverAddr
 		}
 
-		// Инициализация gRPC клиента
-		grpcClient, err := grpc.NewClient(cfg.ServerAddr)
+		// Создаем контейнер зависимостей
+		container, err := NewContainer(cfg, verbose)
 		if err != nil {
-			uiInstance.Output.Errorf("Ошибка подключения к серверу: %v", err)
-			return fmt.Errorf("ошибка подключения к серверу: %w", err)
+			fmt.Fprintf(os.Stderr, "Ошибка инициализации контейнера: %v\n", err)
+			return fmt.Errorf("ошибка инициализации контейнера: %w", err)
 		}
 
-		// Сохраняем клиента в контексте команды
-		ctx := context.WithValue(cmd.Context(), "grpcClient", grpcClient)
-		ctx = context.WithValue(ctx, "config", cfg)
-		ctx = context.WithValue(ctx, "ui", uiInstance)
-
-		// Инициализация сервиса авторизации
-		authService := service.NewAuthService(grpcClient)
-		ctx = context.WithValue(ctx, "authService", authService)
-
-		// Инициализация хранилища сессий
-		sessionStorage := storage.NewSessionStorage()
-		ctx = context.WithValue(ctx, "sessionStorage", sessionStorage)
-
+		// Сохраняем контейнер в контексте команды
+		ctx := context.WithValue(cmd.Context(), containerKey{}, container)
 		cmd.SetContext(ctx)
 		return nil
 	},
 	PersistentPostRunE: func(cmd *cobra.Command, args []string) error {
 		// Закрытие соединений после выполнения команды
-		if authService, ok := cmd.Context().Value("authService").(service.AuthService); ok {
-			return authService.Close()
+		if container, ok := cmd.Context().Value(containerKey{}).(*Container); ok {
+			return container.Close()
 		}
 		return nil
 	},
@@ -92,11 +73,7 @@ CLI клиент позволяет управлять вашими данным
 // Она инициализирует все команды и обрабатывает выполнение.
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
-		if uiInstance == nil {
-			fmt.Fprintf(os.Stderr, "Ошибка: %v\n", err)
-		} else {
-			uiInstance.Output.Errorf("%v", err)
-		}
+		fmt.Fprintf(os.Stderr, "Ошибка: %v\n", err)
 		os.Exit(1)
 	}
 }

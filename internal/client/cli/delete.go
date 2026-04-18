@@ -2,11 +2,7 @@ package cli
 
 import (
 	"fmt"
-	"strings"
-	"time"
 
-	"github.com/Rusich90/GophKeeper/internal/client/storage"
-	"github.com/Rusich90/GophKeeper/internal/client/ui"
 	"github.com/spf13/cobra"
 )
 
@@ -20,75 +16,55 @@ var deleteCmd = &cobra.Command{
 Аргумент id - это начало идентификатора записи (минимум 1 символ).`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// Получаем UI из контекста
-		uiInstance, ok := cmd.Context().Value("ui").(*ui.UI)
-		if !ok {
-			return fmt.Errorf("UI не инициализирован")
-		}
-
-		// Получаем хранилище сессий из контекста
-		sessionStorage, ok := cmd.Context().Value("sessionStorage").(*storage.SessionStorage)
-		if !ok {
-			return fmt.Errorf("хранилище сессий не инициализировано")
-		}
-
-		// Получаем ключ шифрования из сессии
-		session, err := sessionStorage.LoadSession()
+		// Получаем контейнер из контекста
+		container, err := GetContainer(cmd)
 		if err != nil {
-			uiInstance.Output.Error("Сессия не инициализирована. Пожалуйста, войдите в систему.")
-			return fmt.Errorf("сессия не инициализирована: %w", err)
+			return err
 		}
 
-		// Загружаем данные
-		dataStorage := storage.NewDataStorage()
-		storageData, err := dataStorage.Load(session.Key)
+		// Загружаем сессию
+		session, err := LoadSession(container)
 		if err != nil {
-			uiInstance.Output.Errorf("Ошибка загрузки данных: %v", err)
-			return fmt.Errorf("ошибка загрузки данных: %w", err)
+			return err
 		}
 
-		// Поиск записи по префиксу ID
+		// Загружаем секреты
+		storageData, err := container.SecretStorage.Load(session.Key)
+		if err != nil {
+			container.UI.Output.Errorf("Ошибка загрузки секретов: %v", err)
+			return fmt.Errorf("ошибка загрузки секретов: %w", err)
+		}
+
+		// Поиск записи по префиксу ID через сервис
 		idPrefix := args[0]
-		var foundItems []storage.Item
-		var foundIndex = -1
-		
-		for i, item := range storageData.Items {
-			if strings.HasPrefix(item.ID, idPrefix) {
-				foundItems = append(foundItems, item)
-				if foundIndex == -1 {
-					foundIndex = i
-				}
-			}
-		}
+		item, duplicates, err := container.SecretService.FindSecretByIDPrefix(cmd.Context(), storageData, idPrefix)
 
 		// Обработка результатов поиска
-		switch len(foundItems) {
-		case 0:
-			uiInstance.Output.Errorf("Запись с ID '%s' не найдена", idPrefix)
-			return fmt.Errorf("запись не найдена")
-			
-		case 1:
-			// Удаляем запись
-			item := foundItems[0]
-			// Удаляем элемент из среза
-			storageData.Items = append(storageData.Items[:foundIndex], storageData.Items[foundIndex+1:]...)
-			
-			// Обновляем LastModified всей структуры
-			storageData.LastModified = time.Now().UTC().Format(time.RFC3339)
-			
-			// Сохраняем данные
-			if err := dataStorage.Save(storageData, session.Key); err != nil {
-				uiInstance.Output.Errorf("Ошибка сохранения данных: %v", err)
-				return fmt.Errorf("ошибка сохранения данных: %w", err)
-			}
-			
-			uiInstance.Output.Success(fmt.Sprintf("Запись '%s' успешно удалена", item.Title))
-			
-		default:
-			// Найдено несколько записей - выводим таблицу дубликатов
-			uiInstance.Output.Plain(fmt.Sprintf("Найдено несколько записей с префиксом '%s', уточните запрос:", idPrefix))
-			uiInstance.TableRenderer.RenderDuplicatesTable(foundItems)
+		if err != nil {
+			container.UI.Output.Errorf("%v", err)
+			return err
 		}
+
+		if len(duplicates) > 1 {
+			// Найдено несколько записей - выводим таблицу дубликатов
+			container.UI.Output.Plain(fmt.Sprintf("Найдено несколько записей с префиксом '%s', уточните запрос:", idPrefix))
+			container.UI.TableRenderer.RenderDuplicatesTable(duplicates)
+			return nil
+		}
+
+		// Удаляем секрет через сервис
+		if err := container.SecretService.DeleteSecret(cmd.Context(), storageData, item.ID); err != nil {
+			container.UI.Output.Errorf("Ошибка удаления секрета: %v", err)
+			return fmt.Errorf("ошибка удаления секрета: %w", err)
+		}
+
+		// Сохраняем секреты
+		if err := container.SecretStorage.Save(storageData, session.Key); err != nil {
+			container.UI.Output.Errorf("Ошибка сохранения секретов: %v", err)
+			return fmt.Errorf("ошибка сохранения секретов: %w", err)
+		}
+
+		container.UI.Output.Success(fmt.Sprintf("Запись '%s' успешно удалена", item.Title))
 
 		return nil
 	},

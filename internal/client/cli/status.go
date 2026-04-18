@@ -1,10 +1,6 @@
 package cli
 
 import (
-	"fmt"
-
-	"github.com/Rusich90/GophKeeper/internal/client/storage"
-	"github.com/Rusich90/GophKeeper/internal/client/ui"
 	"github.com/spf13/cobra"
 )
 
@@ -15,31 +11,29 @@ var statusCmd = &cobra.Command{
 	Long:  `Проверяет текущий статус авторизации пользователя.`,
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// Получаем UI из контекста
-		uiInstance, ok := cmd.Context().Value("ui").(*ui.UI)
-		if !ok {
-			return fmt.Errorf("UI не инициализирован")
-		}
-
-		// Получаем хранилище сессий из контекста
-		sessionStorage, ok := cmd.Context().Value("sessionStorage").(*storage.SessionStorage)
-		if !ok {
-			return fmt.Errorf("хранилище сессий не инициализировано")
-		}
-
-		// Проверяем наличие сессии
-		session, err := sessionStorage.LoadSession()
+		// Получаем контейнер из контекста
+		container, err := GetContainer(cmd)
 		if err != nil {
-			uiInstance.Output.Warning("Статус: Не авторизован")
-			uiInstance.Output.Plain("Для входа используйте: keeper login")
+			return err
+		}
+
+		// Проверяем наличие сессии (опционально)
+		session, err := LoadSessionOptional(container)
+		if err != nil {
+			return err
+		}
+
+		if session == nil {
+			container.UI.Output.Warning("Статус: Не авторизован")
+			container.UI.Output.Plain("Для входа используйте: keeper login")
 			return nil
 		}
 
-		uiInstance.Output.Success("Статус: Авторизован")
+		container.UI.Output.Success("Статус: Авторизован")
 		if session.Key != "" {
-			uiInstance.Output.Plain("Ключ шифрования: сохранен")
+			container.UI.Output.Plain("Ключ шифрования: сохранен")
 		} else {
-			uiInstance.Output.Warning("Ключ шифрования: не сохранен")
+			container.UI.Output.Warning("Ключ шифрования: не сохранен")
 		}
 		return nil
 	},

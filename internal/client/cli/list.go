@@ -3,8 +3,6 @@ package cli
 import (
 	"fmt"
 
-	"github.com/Rusich90/GophKeeper/internal/client/storage"
-	"github.com/Rusich90/GophKeeper/internal/client/ui"
 	"github.com/spf13/cobra"
 )
 
@@ -20,62 +18,49 @@ var listCmd = &cobra.Command{
   - card: данные банковской карты`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// Получаем UI из контекста
-		uiInstance, ok := cmd.Context().Value("ui").(*ui.UI)
-		if !ok {
-			return fmt.Errorf("UI не инициализирован")
+		// Получаем контейнер из контекста
+		container, err := GetContainer(cmd)
+		if err != nil {
+			return err
 		}
 
-		// Получаем хранилище сессий из контекста
-		sessionStorage, ok := cmd.Context().Value("sessionStorage").(*storage.SessionStorage)
-		if !ok {
-			return fmt.Errorf("хранилище сессий не инициализировано")
-		}
-
-		// Валидация типа данных
+		// Получаем тип данных
 		dataType := args[0]
-		if dataType != "login" && dataType != "text" && dataType != "card" {
-			uiInstance.Output.Error("Неизвестный тип данных. Доступные: login, text, card")
-			return fmt.Errorf("неизвестный тип данных: %s", dataType)
-		}
 
-		// Получаем ключ шифрования из сессии
-		session, err := sessionStorage.LoadSession()
+		// Загружаем сессию
+		session, err := LoadSession(container)
 		if err != nil {
-			uiInstance.Output.Error("Сессия не инициализирована. Пожалуйста, войдите в систему.")
-			return fmt.Errorf("сессия не инициализирована: %w", err)
+			return err
 		}
 
-		// Загружаем данные
-		dataStorage := storage.NewDataStorage()
-		storageData, err := dataStorage.Load(session.Key)
+		// Загружаем секреты
+		storageData, err := container.SecretStorage.Load(session.Key)
 		if err != nil {
-			uiInstance.Output.Errorf("Ошибка загрузки данных: %v", err)
-			return fmt.Errorf("ошибка загрузки данных: %w", err)
+			container.UI.Output.Errorf("Ошибка загрузки секретов: %v", err)
+			return fmt.Errorf("ошибка загрузки секретов: %w", err)
 		}
 
-		// Фильтруем записи по типу
-		var filteredItems []storage.Item
-		for _, item := range storageData.Items {
-			if item.Type == dataType {
-				filteredItems = append(filteredItems, item)
-			}
+		// Фильтруем секреты по типу через сервис
+		filteredItems, err := container.SecretService.FilterSecretsByType(cmd.Context(), storageData, dataType)
+		if err != nil {
+			container.UI.Output.Errorf("%v", err)
+			return err
 		}
 
-		// Проверяем, есть ли записи
+		// Проверяем, есть ли секреты
 		if len(filteredItems) == 0 {
-			uiInstance.Output.Plain("Записи не найдены")
+			container.UI.Output.Plain("Секреты не найдены")
 			return nil
 		}
 
 		// Диспетчеризация функций рендеринга
 		switch dataType {
 		case "login":
-			uiInstance.TableRenderer.RenderLoginTable(filteredItems)
+			container.UI.TableRenderer.RenderLoginTable(filteredItems)
 		case "text":
-			uiInstance.TableRenderer.RenderTextTable(filteredItems)
+			container.UI.TableRenderer.RenderTextTable(filteredItems)
 		case "card":
-			uiInstance.TableRenderer.RenderCardTable(filteredItems)
+			container.UI.TableRenderer.RenderCardTable(filteredItems)
 		}
 
 		return nil
