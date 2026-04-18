@@ -29,6 +29,9 @@ CLI клиент позволяет управлять вашими данным
 		// Инициализация вывода
 		output = NewColorOutput(verbose)
 
+		// Инициализация рендерера таблиц
+		tableRenderer := NewTableRenderer()
+
 		// Инициализация конфигурации
 		var cfg *config.Config
 		var err error
@@ -73,6 +76,9 @@ CLI клиент позволяет управлять вашими данным
 		// Инициализация хранилища сессий
 		sessionStorage := storage.NewSessionStorage()
 		ctx = context.WithValue(ctx, "sessionStorage", sessionStorage)
+
+		// Сохраняем рендерер таблиц в контексте
+		ctx = context.WithValue(ctx, "tableRenderer", tableRenderer)
 
 		cmd.SetContext(ctx)
 		return nil
