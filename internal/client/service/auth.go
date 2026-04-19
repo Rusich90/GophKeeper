@@ -17,12 +17,12 @@ type AuthService interface {
 
 // authService реализация AuthService через gRPC клиент
 type authService struct {
-	grpcClient *grpc.Client
+	grpcClient grpc.ClientInterface
 	validator  validator.CredentialsValidator
 }
 
 // NewAuthService создает новый экземпляр сервиса авторизации
-func NewAuthService(grpcClient *grpc.Client) AuthService {
+func NewAuthService(grpcClient grpc.ClientInterface) AuthService {
 	return &authService{
 		grpcClient: grpcClient,
 		validator:  validator.NewCredentialsValidator(),

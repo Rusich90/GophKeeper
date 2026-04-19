@@ -11,17 +11,22 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/Rusich90/GophKeeper/internal/server/middleware"
-	"github.com/Rusich90/GophKeeper/internal/server/service"
 	"github.com/Rusich90/GophKeeper/pkg/pb"
 )
 
+// SyncServiceInterface определяет интерфейс для сервиса синхронизации
+type SyncServiceInterface interface {
+	Pull(ctx context.Context, login string) ([]byte, int64, error)
+	Push(ctx context.Context, login string, encryptedData []byte) (int64, error)
+}
+
 type SyncServer struct {
 	pb.UnimplementedSyncServer
-	syncService *service.SyncService
+	syncService SyncServiceInterface
 	log         *slog.Logger
 }
 
-func NewSyncServer(syncService *service.SyncService, log *slog.Logger) *SyncServer {
+func NewSyncServer(syncService SyncServiceInterface, log *slog.Logger) *SyncServer {
 	return &SyncServer{
 		syncService: syncService,
 		log:         log,

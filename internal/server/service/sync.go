@@ -10,6 +10,12 @@ import (
 	"github.com/Rusich90/GophKeeper/internal/server/storage/user"
 )
 
+// SyncServiceInterface определяет интерфейс для сервиса синхронизации
+type SyncServiceInterface interface {
+	Pull(ctx context.Context, login string) ([]byte, int64, error)
+	Push(ctx context.Context, login string, encryptedData []byte) (int64, error)
+}
+
 type SyncService struct {
 	userRepo user.UserRepository
 	log      *slog.Logger

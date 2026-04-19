@@ -16,14 +16,21 @@ import (
 	"github.com/Rusich90/GophKeeper/pkg/validator"
 )
 
+// AuthServiceInterface определяет интерфейс для сервиса аутентификации
+type AuthServiceInterface interface {
+	Register(ctx context.Context, login, password string) error
+	Login(ctx context.Context, login, password string) (string, error)
+	Logout(ctx context.Context, login string) error
+}
+
 type AuthServer struct {
 	pb.UnimplementedAuthServer
-	authService *service.AuthService
+	authService AuthServiceInterface
 	log         *slog.Logger
 	validator   validator.CredentialsValidator
 }
 
-func NewAuthServer(authService *service.AuthService, log *slog.Logger) *AuthServer {
+func NewAuthServer(authService AuthServiceInterface, log *slog.Logger) *AuthServer {
 	return &AuthServer{
 		authService: authService,
 		log:         log,

@@ -20,13 +20,13 @@ type SyncService interface {
 
 // syncService реализация SyncService
 type syncService struct {
-	grpcClient     *grpc.Client
+	grpcClient     grpc.ClientInterface
 	sessionStorage *storage.SessionStorage
 	dataFilePath   string
 }
 
 // NewSyncService создает новый экземпляр сервиса синхронизации
-func NewSyncService(grpcClient *grpc.Client, sessionStorage *storage.SessionStorage) SyncService {
+func NewSyncService(grpcClient grpc.ClientInterface, sessionStorage *storage.SessionStorage) SyncService {
 	configDir, err := os.UserHomeDir()
 	if err != nil {
 		configDir = ".gophkeeper"

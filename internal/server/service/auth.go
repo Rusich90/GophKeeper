@@ -24,12 +24,12 @@ var (
 type AuthService struct {
 	userRepo  user.UserRepository
 	tokenRepo token.TokenRepository
-	jwtMgr    *jwt.Manager
+	jwtMgr    jwt.TokenManager
 	log       *slog.Logger
 	validator validator.CredentialsValidator
 }
 
-func NewAuthService(userRepo user.UserRepository, tokenRepo token.TokenRepository, jwtMgr *jwt.Manager, log *slog.Logger) *AuthService {
+func NewAuthService(userRepo user.UserRepository, tokenRepo token.TokenRepository, jwtMgr jwt.TokenManager, log *slog.Logger) *AuthService {
 	return &AuthService{
 		userRepo:  userRepo,
 		tokenRepo: tokenRepo,

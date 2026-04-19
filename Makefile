@@ -57,3 +57,20 @@ docker-migrate-up:
 docker-migrate-down:
 	@echo "Rolling back last migration in Docker..."
 	docker compose exec -T server migrate -path /app/migrations -database "$(DATABASE_DSN)" down 1
+
+# Тестирование
+test:
+	@echo "Running tests with coverage..."
+	go test -v -race -coverprofile=coverage.out ./...
+	@echo ""
+	@echo "Coverage by function:"
+	@go tool cover -func=coverage.out | grep total
+	@echo ""
+	@echo "Coverage percentage:"
+	@go tool cover -func=coverage.out | grep total | awk '{print $$3}'
+
+# Генерация моков
+gen-mocks:
+	@echo "Generating mocks..."
+	mockery --all --dir=internal/server/storage/user
+	mockery --all --dir=internal/server/storage/token

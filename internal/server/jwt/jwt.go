@@ -7,6 +7,12 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
+// TokenManager определяет интерфейс для управления JWT токенами
+type TokenManager interface {
+	GenerateToken(login string) (string, error)
+	ValidateToken(tokenString string) (string, error)
+}
+
 type Manager struct {
 	secret string
 	ttl    time.Duration

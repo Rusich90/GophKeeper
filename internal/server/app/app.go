@@ -39,6 +39,13 @@ type App struct {
 }
 
 func NewApp(cfg *config.Config, log *slog.Logger) (*App, error) {
+	if cfg == nil {
+		panic("config cannot be nil")
+	}
+	if log == nil {
+		panic("logger cannot be nil")
+	}
+
 	a := &App{
 		cfg: cfg,
 		log: log,
@@ -72,6 +79,7 @@ func NewApp(cfg *config.Config, log *slog.Logger) (*App, error) {
 	authService := service.NewAuthService(userRepo, tokenRepo, jwtMgr, a.log)
 	syncService := service.NewSyncService(userRepo, a.log)
 
+	// Приводим к интерфейсу для handler
 	authServer := handler.NewAuthServer(authService, a.log)
 	syncServer := handler.NewSyncServer(syncService, a.log)
 
@@ -149,13 +157,17 @@ func (a *App) Stop() error {
 		a.server.Stop()
 	}
 
-	a.pool.Close()
-	a.log.Info("Database pool closed")
-
-	if err := a.tokenRepo.Close(); err != nil {
-		a.log.Error("Error closing Redis connection", "error", err)
+	if a.pool != nil {
+		a.pool.Close()
+		a.log.Info("Database pool closed")
 	}
-	a.log.Info("Redis connection closed")
+
+	if a.tokenRepo != nil {
+		if err := a.tokenRepo.Close(); err != nil {
+			a.log.Error("Error closing Redis connection", "error", err)
+		}
+		a.log.Info("Redis connection closed")
+	}
 
 	return nil
 }

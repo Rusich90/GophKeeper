@@ -93,10 +93,10 @@ func (s *secretService) UpdateSecret(ctx context.Context, storageData *storage.S
 	for i, item := range storageData.Items {
 		if item.ID == secret.ID {
 			storageData.Items[i] = *secret
-			
+
 			// Обновляем время последнего изменения
 			storageData.LastModified = time.Now().UTC().Format(time.RFC3339)
-			
+
 			return nil
 		}
 	}

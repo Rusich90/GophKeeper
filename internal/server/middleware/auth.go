@@ -8,9 +8,12 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
-
-	"github.com/Rusich90/GophKeeper/internal/server/service"
 )
+
+// TokenValidator - интерфейс для валидации токенов
+type TokenValidator interface {
+	ValidateToken(ctx context.Context, token string) (string, error)
+}
 
 const (
 	authorizationHeader = "authorization"
@@ -23,7 +26,7 @@ type contextKey string
 const LoginContextKey contextKey = "login"
 const TokenContextKey contextKey = "token"
 
-func AuthMiddleware(authService *service.AuthService) grpc.UnaryServerInterceptor {
+func AuthMiddleware(validator TokenValidator) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 		// Пропускаем методы Register и Login без проверки токена
 		if strings.HasSuffix(info.FullMethod, "/Register") || strings.HasSuffix(info.FullMethod, "/Login") {
@@ -47,13 +50,13 @@ func AuthMiddleware(authService *service.AuthService) grpc.UnaryServerIntercepto
 			return nil, status.Error(codes.Unauthenticated, "invalid authorization header format")
 		}
 
-		// Удаляем префикс "Bearer " (с учетом регистра)
-		if len(token) > 7 && (token[0:7] == "Bearer " || token[0:7] == "bearer ") {
+		// Удаляем префикс "Bearer " (любой регистр)
+		if len(token) > 7 {
 			token = token[7:]
 		}
 
 		// Проверяем токен
-		login, err := authService.ValidateToken(ctx, token)
+		login, err := validator.ValidateToken(ctx, token)
 		if err != nil {
 			return nil, status.Error(codes.Unauthenticated, "invalid or expired token")
 		}

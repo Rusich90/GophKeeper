@@ -55,21 +55,21 @@ func NewContainer(cfg *config.Config, verbose bool) (*Container, error) {
 // Close закрывает все ресурсы контейнера
 func (c *Container) Close() error {
 	var errs []error
-	
+
 	// Закрываем gRPC клиент
 	if c.GRPCClient != nil {
 		if err := c.GRPCClient.Close(); err != nil {
 			errs = append(errs, fmt.Errorf("ошибка закрытия gRPC клиента: %w", err))
 		}
 	}
-	
+
 	// Закрываем сервис авторизации
 	if c.AuthService != nil {
 		if err := c.AuthService.Close(); err != nil {
 			errs = append(errs, fmt.Errorf("ошибка закрытия сервиса авторизации: %w", err))
 		}
 	}
-	
+
 	if len(errs) > 0 {
 		return fmt.Errorf("ошибки при закрытии ресурсов: %v", errs)
 	}
