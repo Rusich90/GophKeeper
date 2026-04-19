@@ -247,36 +247,12 @@ func TestAuthService_Close_Success(t *testing.T) {
 	// Создаем сервис с моками
 	service := NewAuthService(mockGrpcClient)
 
-	// Настраиваем моки
-	mockGrpcClient.On("Close").Return(nil)
-
 	// Выполняем тест
 	err := service.Close()
 
 	// Проверяем результаты
 	assert.NoError(t, err)
 
-	// Проверяем, что моки были вызваны
-	mockGrpcClient.AssertExpectations(t)
-}
-
-func TestAuthService_Close_Failed(t *testing.T) {
-	mockGrpcClient := mocks.NewClientInterface(t)
-	
-	// Создаем сервис с моками
-	service := NewAuthService(mockGrpcClient)
-
-	// Настраиваем моки
-	closeErr := errors.New("close connection failed")
-	mockGrpcClient.On("Close").Return(closeErr)
-
-	// Выполняем тест
-	err := service.Close()
-
-	// Проверяем результаты
-	assert.Error(t, err)
-	assert.Equal(t, closeErr, err)
-
-	// Проверяем, что моки были вызваны
-	mockGrpcClient.AssertExpectations(t)
+	// Проверяем, что gRPC клиент не был закрыт (это делает контейнер)
+	mockGrpcClient.AssertNotCalled(t, "Close")
 }

@@ -26,7 +26,47 @@ build-server:
 	go build -o cmd/server/server ./cmd/server
 
 build-client:
-	go build -o keeper ./cmd/client
+	@echo "Building client..."
+	@VERSION=$$(git describe --tags --always --dirty 2>/dev/null || echo "dev") && \
+	BUILD_DATE=$$(date -u +"%Y-%m-%dT%H:%M:%SZ") && \
+	echo "Version: $$VERSION" && \
+	echo "Build Date: $$BUILD_DATE" && \
+	go build -ldflags "-X github.com/Rusich90/GophKeeper/internal/client.Version=$$VERSION -X github.com/Rusich90/GophKeeper/internal/client.BuildDate=$$BUILD_DATE" -o keeper ./cmd/client
+
+# Кросс-платформенная сборка клиента
+build-client-mac:
+	@echo "Building client for macOS..."
+	@mkdir -p dist/client
+	@echo "Building for macOS (amd64)..."
+	GOOS=darwin GOARCH=amd64 go build -o dist/client/keeper-darwin-amd64 ./cmd/client
+	@echo "Building for macOS (arm64)..."
+	GOOS=darwin GOARCH=arm64 go build -o dist/client/keeper-darwin-arm64 ./cmd/client
+	@echo "macOS builds completed!"
+	@ls -lh dist/client/keeper-darwin-*
+
+build-client-linux:
+	@echo "Building client for Linux..."
+	@mkdir -p dist/client
+	@echo "Building for Linux (amd64)..."
+	GOOS=linux GOARCH=amd64 go build -o dist/client/keeper-linux-amd64 ./cmd/client
+	@echo "Building for Linux (arm64)..."
+	GOOS=linux GOARCH=arm64 go build -o dist/client/keeper-linux-arm64 ./cmd/client
+	@echo "Linux builds completed!"
+	@ls -lh dist/client/keeper-linux-*
+
+build-client-windows:
+	@echo "Building client for Windows..."
+	@mkdir -p dist/client
+	@echo "Building for Windows (amd64)..."
+	GOOS=windows GOARCH=amd64 go build -o dist/client/keeper-windows-amd64.exe ./cmd/client
+	@echo "Windows build completed!"
+	@ls -lh dist/client/keeper-windows-*
+
+# Очистка директории с бинарными файлами
+clean-dist:
+	@echo "Cleaning dist directory..."
+	@rm -rf dist/
+	@echo "Done!"
 
 run:
 	go run cmd/server/main.go

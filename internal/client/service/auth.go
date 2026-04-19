@@ -54,7 +54,8 @@ func (s *authService) Logout(ctx context.Context, token string) error {
 	return s.grpcClient.Logout(ctx, token)
 }
 
-// Close закрывает соединение с gRPC сервером
+// Close закрывает ресурсы сервиса авторизации
+// Примечание: gRPC клиент закрывается контейнером, поэтому здесь ничего не делаем
 func (s *authService) Close() error {
-	return s.grpcClient.Close()
+	return nil
 }
