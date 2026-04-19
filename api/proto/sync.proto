@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package gophkeeper.v1;
+
+option go_package = "gophkeeper/pkg/pb";
+
+import "google/protobuf/empty.proto";
+
+service Sync {
+  // Получить текущие данные с сервера (Pull)
+  rpc Pull (google.protobuf.Empty) returns (SyncResponse);
+  
+  // Отправить данные на сервер (Push)
+  rpc Push (SyncRequest) returns (SyncResponse);
+}
+
+// Запрос на обновление данных
+message SyncRequest {
+  bytes data = 1; // Зашифрованный бинарный блоб данных
+}
+
+// Ответ сервера (содержит данные и временную метку)
+message SyncResponse {
+  bytes data = 1;       // Зашифрованный бинарный блоб данных (может быть пустым)
+  int64 updated_at = 2; // Время последнего обновления файла на сервере (Unix timestamp)
+}
